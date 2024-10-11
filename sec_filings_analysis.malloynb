@@ -1,0 +1,273 @@
+>>>malloy
+import 'sec_filings.malloy'
+>>>markdown
+Let's look at Basic Descriptors
+1.	What are the basic descriptors of this dataset related to the number of companies, forms, and industries?
+>>>malloy
+# bar_chart
+run: sub -> {
+    group_by: Fiscal_Period_Close is period.year
+    aggregate: Unique_10K_submitters is count(cik)
+    where: form = "10-K" and period.year > @2008    
+}
+>>>markdown
+Let's look at how many industries there are 
+>>>malloy
+# bar_chart
+run: sub -> {
+    group_by: Fiscal_Period_Close is period.year
+    aggregate: Unique_Industries is count(sic4.Description)
+    where: period.year > @2010 --form = "10-K" and
+}
+>>>markdown
+Let's look at something else
+>>>malloy
+run: sub -> {
+    group_by: form
+    aggregate: num_forms is count(adsh)
+    # percent
+    aggregate: pct_of_total is count(adsh) / all(count(adsh))
+    # bar_chart { size=spark }
+    nest: by_year is {
+        group_by: period.year
+        aggregate: num_forms is count(adsh)
+    }
+}
+>>>malloy
+run: sub -> {
+    group_by: form
+    aggregate: num_forms is count(adsh)
+    # percent
+    aggregate: pct_of_total is count(adsh) / all(count(adsh))
+    nest: by_year is {
+        group_by: period.year
+        aggregate: num_forms is count(adsh)
+    }
+}
+>>>markdown
+2.	Which industries are growing or shrinking?
+>>>malloy
+run: sub -> {
+    group_by: Industry_Name is sic4.Description
+    aggregate: unique_co is count(cik)
+    where: form = "10-K" and period.year >= @2011 and period.year < @2024
+    # line_chart { size=spark }
+    nest: trend_2011_to_2023 is {
+         group_by: period.year
+         aggregate: num_companies is count(adsh)
+     }
+}
+>>>markdown
+Now let's look at industry growth. The query below shows the perent growth of all industries that had at least five companies in 2011.
+>>>malloy
+
+run: sub -> {
+    group_by: sic4.Description
+    aggregate: unique_co is count(cik)
+    # hidden
+    total_filed_10ks is count(adsh)
+    totalcos_2015 is count(cik) {where: period.year = @2015}
+    totalcos_2023 is count(cik) {where: period.year = @2023}
+     # percent
+    pct_growth is ((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    abs_pct_growth is abs((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    diff_abs is abs(count(cik) {where: period.year = @2023} - count(cik) {where: period.year = @2011})
+    order_by: abs_pct_growth desc
+    having: totalcos_2015 >= 10
+    where: form = "10-K"  and period.year >= @2011 and period.year < @2024
+    # line_chart { size=spark }
+     nest: by_time is {
+                 group_by: period.year
+                 aggregate: totalco1 is count(cik)
+    }   
+}
+>>>markdown
+Now let's look at industries with at least 10 companies in 2011
+>>>malloy
+
+run: sub -> {
+    group_by: sic4.Description
+    aggregate: unique_co is count(cik)
+    # hidden
+    total_filed_10ks is count(adsh)
+    totalcos_2011 is count(cik) {where: period.year = @2011}
+    totalcos_2023 is count(cik) {where: period.year = @2023}
+     # percent
+    pct_growth is ((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    abs_pct_growth is abs((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    diff_abs is abs(count(cik) {where: period.year = @2023} - count(cik) {where: period.year = @2011})
+    order_by: abs_pct_growth desc
+    having: totalcos_2011 >= 10
+    where: form = "10-K"  and period.year >= @2011 and period.year < @2024
+    # bar_chart { size=spark }
+     nest: by_time is {
+                 group_by: period.year
+                 aggregate: totalco1 is count(cik)
+    }   
+}
+>>>markdown
+Now instead of looking at pct_growth, let's look at total growth
+>>>malloy
+
+run: sub -> {
+    group_by: sic4.Description
+    aggregate: unique_co is count(cik)
+    # hidden
+    total_filed_10ks is count(adsh)
+    totalcos_2011 is count(cik) {where: period.year = @2011}
+    totalcos_2023 is count(cik) {where: period.year = @2023}
+     # percent
+    pct_growth is ((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    abs_pct_growth is abs((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    diff_abs is abs(count(cik) {where: period.year = @2023} - count(cik) {where: period.year = @2011})
+    order_by: diff_abs desc
+    having: totalcos_2011 >= 5
+    where: form = "10-K"  and period.year >= @2011 and period.year < @2024
+    # bar_chart { size=spark }
+     nest: by_time is {
+                 group_by: period.year
+                 aggregate: totalco1 is count(cik)
+    }   
+}
+>>>markdown
+Now let's look at which states are feeling the effect of this
+>>>malloy
+run: sub -> {
+    group_by: sic4.Description
+    aggregate: unique_co is count(cik)
+    # hidden
+    aggregate: total_filed_10ks is count(adsh)
+    --# percent
+    --aggregate: pct_total is count(adsh) / all(count())
+    aggregate: totalcos_2011 is count(cik) {where: period.year = @2011}
+    aggregate: totalcos_2023 is count(cik) {where: period.year = @2023}
+    --growth is count(cik) {where: period.year = @2023} - count(cik) {where: period.year = @2011}
+    # percent
+    pct_growth is ((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+    # hidden
+    abs_pct_growth is abs((count(cik) {where: period.year = @2023} - (count(cik) {where: period.year = @2011})) / (count(cik) {where: period.year = @2011}))
+
+    # hidden
+    diff_abs is abs(count(cik) {where: period.year = @2023} - count(cik) {where: period.year = @2011})
+    order_by: diff_abs desc
+    having: totalcos_2011 >= 20
+    where: form = "10-K"  and period.year >= @2011 and period.year < @2024
+    --# line_chart { size=spark }
+      nest: by_top_3_states is {
+             group_by: stprma
+             aggregate: totalco is count(cik)
+             where: countryba = "US"
+             limit: 3
+             # line_chart { size=spark }
+             nest: by_time is {
+                 group_by: period.year
+                 aggregate: totalco1 is count(cik)
+             }   
+      }
+
+}
+>>>markdown
+RQ 2: Which industries file the most 8-Ks?  
+>>>malloy
+run: sub -> {
+        group_by: sic4.Description
+        aggregate: num_orgs is count(cik) --{where: form = "10-K"}
+        num_8ks is count(adsh) {where: form = "8-K"}
+        num_10ks is count(adsh) {where: form = "10-K"}
+        aggregate: per_co_8k is count(adsh) {where: form = "8-K"} / count(cik) {where: form = "10-K"}
+        order_by: per_co_8k desc
+        having: num_orgs > 19
+        where: form = "10-K" or form = "8-K" and period ? @2018 to @2024-- and period.day > @2010
+         # bar_chart { size=spark }
+         --# bar_chart
+        nest: by_8k_per_year is {
+            group_by: period.year
+            --aggregate: count_co is count(cik)
+            --aggregate: count_8k is count(adsh) {where: form = "8-K"}
+            aggregate: avg_8k_per_year is count(adsh) {where: form = "8-K"} / count(cik) {where: form = "10-K"}
+            --where: form = "10-K" or form = "8-K" and period.quarter < @2023-12-01 and period.quarter > @2011-01-01
+            --aggregate:   --and countryba = "US"} / count(adsh) 
+            --aggregate: per_co_year_8ka is count(adsh) {where: form and countryba = "US"} / count(adsh) 
+        }
+
+}
+>>>markdown
+RQ 3. Which industries make the most amendments to their 10-Ks? First, let's look at the total number of amended 10-Ks, and then we will look at which industries have the most amendments
+>>>malloy
+# bar_chart
+run: sub -> {
+    group_by: Period_Close is period.year
+    aggregate: amended_10Ks is count(cik)
+    where: form = "10-K/A" and period.year >= @2011 and period.year < @2024
+}
+>>>malloy
+run: sub -> {
+    group_by: sic4.Description
+
+    aggregate: unique_co is count(cik)
+    total_filed_10ks is count(adsh) {where: form = "10-K"}
+    # hidden
+    diff_abs is abs(count(cik) {where: period.year = @2023} - count(cik) {where: period.year = @2011})
+    ind_size_2023 is count(cik) {where: period.year = @2023}
+    having: ind_size_2023 > 60
+    
+    # number="0.0%"
+    aggregate:  pct_a_2023 is count(cik) {where: form = "10-K/A" and period.year = @2023} / count(adsh) {where: form = "10-K" and period.year = @2023}
+     # number="0.0%"
+    aggregate:  pct_a_all is count(cik) {where: form = "10-K/A"} / count(adsh) {where: form = "10-K"}
+     order_by: pct_a_all desc
+     # line_chart { size=spark }
+    nest: trend_2023_to_2011 is {
+        group_by: year_close is period.year
+        aggregate: perct_a is count(cik) {where: form = "10-K/A"} / count(adsh) {where: form = "10-K"}
+        --where: period = @2010 to @2024
+    }
+}
+>>>markdown
+RQ 5: Which industries are transitioned into most often? Which industries are transitioned out of most often?
+>>>malloy
+ run: find_sic_change_w_descriptions -> {
+    group_by: new_desc
+    aggregate: total_10ks, uniq_orgs_total, num_switching_in, pct_switched_in, totalcos_2011, totalcos_2023
+    order_by: pct_switched_in desc
+    having: uniq_orgs_total > 35
+ }
+>>>markdown
+Next, we will look at those who are moving out. 
+>>>malloy
+  run: find_sic_change_w_descriptions -> {
+    group_by: old_desc
+     aggregate: total_10ks, uniq_orgs_total, num_switching_out, pct_switched_out, totalcos_2011, totalcos_2023
+    order_by: pct_switched_out desc
+    having: uniq_orgs_total > 35
+  
+ }
+>>>markdown
+RQ 4. Which industries change their reported mailing or business address most frequently? 
+
+The query below, shows total_moves_per_10k
+>>>malloy
+
+run: merged1 -> {
+        group_by: Description_nc, ind_counts.ind_sub_total
+        --# percent
+        aggregate: total_moves is count(adsh)
+        # percent
+        total_moves_per_10k is count(adsh) / ind_counts.ind_sub_total.sum()
+       # percent
+        out_state_moves is count(adsh) {where: old_stprba != stprba and countryba = "US" or countryba = "CA" and old_countryma = "US" or old_countryma = "CA" } / count(adsh) --{where:}
+        order_by: total_moves_per_10k desc
+    where: change_in_zipma = "True" or change_in_zipba = True or 
+    change_in_cityma = "True" or change_in_cityba = "True" or 
+    change_in_stprba = "True" or change_in_stprba = "True" or 
+    change_in_countryma = "True" or change_in_countryba = "True" or 
+    change_in_bas1 = "True" or change_in_mas1 = "True" 
+    
+       having: total_moves > 40
+}
